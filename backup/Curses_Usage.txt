@@ -1,0 +1,809 @@
+
+--------------------------------------------------------------------------------
+
+◇ UNIX 螢幕導向程式的發展利器 - curses
+--------------------------------------------------------------------------------==============================================================================
+此兩篇文章原載於“交大計中通訊”, 1993.11 -- 1993.12.
+==============================================================================
+
+                   UNIX 螢幕導向程式的發展利器 - curses
+
+                                                         校園網路策進會
+                                                         會長    林建宏
+
+
+ ■ 前言
+
+    相信您在網路上一定用過如  tin,elm 等工具, 這些軟體有項共同的特色,
+    即他們能利用上下左右等方向鍵來控制游標的位置.  除此之外, 這些程式
+    的畫面也較為美觀. 對 Programming 有興趣的朋友一定對此感到好奇, 也
+    許他能在 PC 上用 Turbo C 輕易地寫出類似的程式, 然而, 但當他將相同
+    的程式一字不變地移到工作站上來編譯時, 卻出現一堆抓也抓不完的錯誤.
+    其實, 原因很簡單, 他使用的函式庫可能在 UNIX 上是沒有定義的.  有些
+    在 Turbo-C 上被廣泛使用的一些函式, 可能在 UNIX 上是不被定義的.
+
+    為了因應網路上各式各樣的終端機形態  (terminal), UNIX 上特別發展出
+    一套函式庫, 專門用來處理 UNIX 上游標移動及螢幕的顯示.  這就是本篇
+    文章要為您介紹的 - curses.h 函式庫.  利用這個函式庫, 您也可以寫出
+    像 elm 般利用方向鍵來移動光棒位置的程式. (CCCA 近來所提供的線上選
+    課程式, 及程式服務界面, 即是筆者利用 curses 發展而成的 )
+
+
+ ■ curses 的歷史與版本
+
+    cureses 最早是由柏克萊大學的 Bill Joy 及 Ken Arnold 所發展出來的.
+    當時發展此一函式庫主要原因是為了提高程式對不同終端機的相容性而設
+    計的.  因此, 利用 curses  發展出來的程式將和您所使用的終端機無關.
+    也就是說, 您不必擔心您的程式因為換了一部終端機而無法使用.  這對程
+    式設計師而言,    尤其是網路上程式的撰寫,    是件相當重要的一件事.
+    curses之所以能對上百種以上的終端機工作,  是因為它將所有終端機的資
+    料, 存放在一個叫 termcap 的資料庫, ( 而在第二版的 System V 系統中
+    , 新版的 curses 以 terminfo 取代原來的 termcap). 有了這些記錄, 程
+    式就能夠知道遇到哪一種終端機時,   須送什麼字元才能移動游標的位置,
+    送什麼字元才能清除整個螢幕清除. (* 註一)
+
+    另外, 本文的介紹 以 System V 的 curses 版本為主.
+
+
+ ■ 如何在您的程式使用 curses ?
+
+    在您的 C 程式的檔頭將  <curses.h> include 進來.當您引進  curses.h
+    這個函式庫後, 系統會自動將 <stdio.h> 和 <unctl.h>一併  include 進
+    來. 另外, 在  System V  版本中,  <terminfo.h>  這個函式庫也將一併
+    include進來.
+
+     #include <curses.h>
+
+     main()
+     {
+      :  :
+      :  :
+     }
+
+    當然, 您的系統內必須放有 curses.h 這個函式庫.
+
+
+ ■ 如何編譯(compile)
+
+    當您編輯好您的程式, 在 UNIX 提示符號下鍵入:
+
+      % /usr/5bin/cc [file.c] -lcurses
+                               ^^^^^^^
+                               引進 curses.h 這個 library
+
+    或 % /usr/5bin/cc [file.c] -lcurses -ltermlib
+
+      (*註二)
+
+
+ ■ 如何開始我的第一個 curses 程式?
+
+    在開始使用 curses 的一切命令之前, 您必須先利用  initscr()這個函式
+    來開啟 curses 模式.
+
+    相對的, 在結束  curses  模式前  ( 通常在您結束程式前  )  也必須以
+    endwin()來關閉 curses 模式.
+
+     #include <curses.h>
+
+     main()
+     {
+       initscr();
+       :  :
+       :  :
+       :  :
+       endwin();
+     }
+
+    這是一般 curses 程式標準的模式.
+
+    此外, 您可以就您程式所需, 而做不同的設定. 當然, 您可以不做設定, 而
+    只是呼叫 initscr().
+
+    您可以自己寫一個函式來存放所有您所須要的設定. 平常使用時, 只要呼叫
+    這個函式即可啟動 curses 並完成一切設定.
+
+    下面的例子, 即是筆者將平常較常用的一些設定放在一個叫 initial()的函
+    式內.
+
+      void initial()
+      {
+        initscr();
+        cbreak();
+        nonl();
+        noecho();
+        intrflush(stdscr,FALSE);
+        keypad(stdscr,TRUE);
+        refresh();
+      }
+
+
+   各函式分別介紹如下:
+
+     □ initscr()
+
+          initscr()  是一般 curses 程式必須先呼叫的函數, 一但這個函數
+          被呼叫之後, 系統將根據終端機的形態並啟動 curses 模式.
+
+     □ endwin()
+
+          curses 通常以呼叫 endwin() 來結束程式.  endwin() 可用來關閉
+          curses 模式, 或是暫時的跳離  curses 模式.如果您在程式中須要
+          call shell ( 如呼叫 system() 函式 ) 或是需要做 system call,
+          就必須先以   endwin()   暫時跳離   curses  模式.   最後再以
+          wrefresh() doupdate() 來重返 curses 模式.
+
+     □ cbreak()
+        nocbreak()
+
+          當 cbreak  模式被開啟後, 除了 DELETE 或 CTRL 等仍被視為特殊
+          控制字元外一切輸入的字元將立刻被一一讀取.當處於 nocbreak 模
+          式時, 從鍵盤輸入的字元將被儲存在  buffer 裡直到輸入  RETURN
+          或 NEWLINE. 在較舊版的 curses 須呼叫 crmode(),nocrmode() 來
+          取代 cbreak(),nocbreak()
+
+     □ nl()
+        nonl()
+
+          用來決定當輸入資料時, 按下 RETURN 鍵是否被對應為 NEWLINE 字
+          元 ( 如 \n ).
+          而輸出資料時, NEWLINE  字元是否被對應為  RETURN 和 LINDFEED
+          系統預設是開啟的.
+
+     □ echo()
+        noecho()
+
+          此函式用來控制從鍵盤輸入字元時是否將字元顯示在終端機上. 系統
+          預設是開啟的.
+
+     □ intrflush(win,bf)
+
+          呼叫 intrflush 時須傳入兩個值:
+          win 為一 WINDOW 型態指標, 通常傳入標準輸出入螢幕 stdscr
+          bf 為 TRUE 或 FALSE
+
+          當 bf 為 true 時, 當輸入中斷字元 ( 如 break) 時, 中斷的反應
+          將較為快速. 但可能會造成螢幕的錯亂.
+
+      □ keypad(win,bf)
+
+          呼叫 keypad 時須傳入兩個值:
+          win 為一 WINDOW 型態指標, 通常傳入標準輸出入螢幕 stdscr
+          bf 為 TRUE 或 FALSE
+
+          當開啟  keypad 後, 可以使用鍵盤上的一些特殊字元, 如上下左右
+          等方向鍵, curses 會將這些特殊字元轉換成 curses.h 內定義的一
+          些特殊鍵. 這些定義的特殊鍵通常以 KEY_ 開頭.
+
+      □ refresh()
+
+          refresh() 為 curses 最常呼叫的一個函式.
+
+          curses 為了使螢幕輸出入達最佳化, 當您呼叫螢幕輸出函式企圖改
+          變螢幕上的畫面時, curses  並不會立刻對螢幕做改變,  而是等到
+          變螢幕上的畫面時, curses  並不會立刻對螢幕做改變,  而是等到
+          refresh() 呼叫後, 才將剛才所做的變動一次完成.  其餘的資料將
+          維持不變. 以盡可能送最少的字元至螢幕上. 減少螢幕重繪的時間.
+          如果是 initscr() 後第一次呼叫  refresh(), curses 將做清除螢
+          幕的工作.
+
+
+ ■ 游標的控制
+
+      move(y,x)       將游標移動至 x,y 的位置
+      getyx(win,y,x)  得到目前游標的位置
+                       (請注意! 是 y,x 而不是 &y,&x )
+
+
+ ■ 有關清除螢幕的函式
+
+      clear()
+      erase()         將整個螢幕清除
+                       (請注意配合 refresh() 使用)
+
+
+ ■ 如何在螢幕上顯示字元
+
+      echochar(ch)              顯示某個字元
+
+      addch(ch)                 顯示某個字元
+      mvaddch(y,x,ch)           在(x,y) 上顯示某個字元
+                                相當於呼叫 move(y,x);addch(ch);
+
+      addstr(str)               顯示一串字串
+      mvaddstr(y,x,str)         在(x,y) 上顯示一串字串
+                                相當於呼叫 move(y,x);addstr(str);
+
+      printw(format,str)        類似 printf() , 以一定的格式輸出至螢幕
+      mvprintw(y,x,format,str)  在(x,y) 位置上做 printw 的工作.
+                                相當於呼叫 move(y,x);printw(format,str);
+
+
+ ■ 如何從鍵盤上讀取字元
+
+      getch()                        從鍵盤讀取一個字元 (注意! 傳回的是整數值)
+      getstr()                       從鍵盤讀取一串字元
+      scanw(format,&arg1,&arg2...)   如同 scanf, 從鍵盤讀取一串字元
+
+      範例:
+
+      int ch;
+      char string1[80];   /* 請注意! 不可宣告為 char *string1; */
+      char string2[80];
+
+      echo();            /* 開啟 echo 模式, 使輸入立刻顯示在螢幕上 */
+      ch=getch();
+      string1=getstr();
+      scanw("%s",string2);
+      mvprintw(10,10,"String1=%s",string1);
+      mvprintw(11,10,"String2=%s",string2);
+
+ ■ 如何利用方向鍵
+
+    curses 將一些如方向鍵等特殊控制字元, 以 KEY_ 為開頭定義在 curses.h
+    這個檔案裡頭, 如 KEY_UP  即代表方向鍵的  " ↑ ".  但, 如果您想使用
+    curses.h  所為您定義的這些特殊鍵的話,  您就必須將   keypad  設定為
+    TRUE. 否則, 您就必須自己為所有的特殊鍵定義了.
+
+    curses.h 為一些特殊鍵的定義如下:
+
+      KEY_UP          0403           ↑
+      KEY_DOWN        0402           ↓
+      KEY_LEFT        0404           ←
+      KEY_RIGHT       0405           →
+      KEY_HOME        0406           Home key (upward+left arrow)
+      KEY_BACKSPACE   0407           backspace (unreliable)
+      KEY_F0          0410           Function keys.
+      KEY_F(n)        (KEY_F0+(n))   Formula for f .
+      KEY_NPAGE       0522           Next page
+      KEY_PPAGE       0523           Previous page
+
+    以上僅列出筆者較常使用的一些控制鍵, 至於其他控制鍵的定義, 請自行參
+    閱 man curses (* 註三)
+
+    一併為您列出其他常用的一些特殊字元
+
+     [TAB]                 /t
+     [ENTER]               /r
+     [ESC]                 27
+     [BACKSPACE]           127
+
+
+  ■ 如何改變螢幕顯示字元的屬性
+
+    為了使輸出的螢幕畫面更為生動美麗,  我們常須要在螢幕上做一些如反白,
+    閃爍等變化.  curses 定義了一些特殊的屬性, 透過這些定義, 我們也可以
+    在 curses 程式裏控制螢幕的輸出變化.
+
+      attron(mod)    開啟屬性
+      attroff(mod)   關閉屬性
+
+    curses.h 裡頭定義了一些屬性, 如:
+
+      A_UNDERLINE    加底線
+      A_REVERSE      反白
+      A_BLINK        閃爍
+      A_BOLD         高亮度
+      A_NORMAL       標準模式 (只能配合 attrset() 使用)
+
+
+    當使用 attron() 開啟某一種特殊屬性模式後, 接下來在螢幕的輸出都會以
+    該種屬性出現. 直到您呼叫 attroff() 將此模式關閉.
+
+    請注意, 當您欲 attron() 開啟另一種屬性時, 請記得利用 attroff()先關
+    閉原來的屬性, 或直接以 attrset(A_NORMAL)  將所有特殊屬性關閉.否則,
+    curses 會將兩種屬性做重疊處理.
+
+    範例:
+
+        attrset(A_NORMAL);            /* 先將屬性設定為正常模式       */
+        attron(A_UNDERLINE);          /* 加底線                       */
+        mvaddstr(9,10,"加底線");      /* 加底線輸出一串字元           */
+        attroff(A_UNDERLINE);         /* 關閉加底線模式, 恢復正常模式 */
+        attron(A_REVERSE);            /* 開啟反白模式                 */
+        mvaddstr(10,10,"反白");       /* 輸出一串反白字元             */
+        attroff(A_REVERSE);           /* 關閉反白模式, 恢復正常模式   */
+        attron(A_BLINK);              /* 開啟閃爍模式                 */
+        mvaddstr(11,10,"閃爍");       /* 輸出一串閃爍字元             */
+        attroff(A_BLINK);             /* 關閉閃爍模式, 恢復正常模式   */
+        attron(A_BOLD);               /* 開啟高亮度模式               */
+        mvaddstr(12,10,"高亮度");     /* 輸出一串高亮度字元           */
+        attroff(A_BOLD);              /* 關閉高亮度模式, 恢復正常模式 */
+
+
+  ■ 其他常用的一些函式
+
+       beep()              發出一聲嗶聲
+       box(win,ch1,ch2)    自動畫方框  ch1: 畫方框時垂直方向所用字元
+                                       ch2: 畫方框時水平方向所用字元
+
+                                       example: box(stdscr,'|','-');
+                                       將以 | 及 - 圍成一個方框
+
+  ■ 應用完整範例
+
+    下面所舉的例子, 即完全利用剛剛所介紹的函式來完成. 這個程式可將從鍵
+    盤上讀取的字元顯示在螢幕上, 並且可以上下左右方向鍵來控制游標的位置
+    , 當按下 [ESC] 後, 程式即結束.
+
+    您有沒有發現, 這不就是一個簡單全螢幕編輯器的雛形嗎?
+
+
+   #include <curses.h>                  /* 引進 curses.h, 並自動引進 stdio.h */
+
+   #define StartX  1                    /* 決定游標初始位置 */
+   #define StartY  1
+
+   void initial();
+
+   main()
+   {
+      int x=StartX;                     /* 宣告 x,y 並設定其初值 */
+      int y=StartY;
+      int ch;                           /* 宣告 ch 為整數,配合 getch() 使用 */
+
+      initial();                        /* 呼叫 initial(), 啟動 curses 模式, */
+                                        /* 並完成其它設定 */
+
+      box(stdscr,'|','-');              /* 畫方框 */
+
+      attron(A_REVERSE);                /* 開啟反白模式 */
+      mvaddstr(0,20,"Curses Program");  /* 在 (20,0) 處輸出反白字元 */
+      attroff(A_REVERSE);               /* 關閉反白模式 */
+
+      move(x,y);                        /* 將游標移至初始位置 */
+
+      do {                              /* 以無限迴圈不斷等待輸入 */
+       ch=getch();                      /* 等待自鍵盤輸入字元 */
+       switch(ch) {                     /* 判斷輸入字元為何 */
+
+          case KEY_UP: --y;             /* 判斷是否"↑"鍵被按下 */
+                       break;
+          case KEY_DOWN: ++y;           /* 判斷是否"↓"鍵被按下 */
+                       break;
+          case KEY_RIGHT: ++x;          /* 判斷是否"→"鍵被按下 */
+                       break;
+          case KEY_LEFT: --x;           /* 判斷是否"←"鍵被按下 */
+                       break;
+          case '\r':                    /* 判斷是否 ENTER 鍵被按下 */
+                    ++y;
+                    x=0;
+                    break;
+          case '\t':                    /* 判斷是否 TAB 鍵被按下 */
+                    x+=7;
+                    break;
+          case 127:                     /* 判斷是否 BACKSPACE 鍵被按下 */
+                     mvaddch(y,--x,' ');/* delete 一個字元 */
+                     break;
+
+          case 27: endwin();            /* 判斷是否[ESC]鍵被按下 */
+                   exit(1);             /* 結束 curses 模式 */
+                                        /* 結束此程式 */
+
+          default:
+                   addch(ch);           /* 如果不是特殊字元, 將此字元印出 */
+                   x++;
+                   break;
+        }
+        move(y,x);                      /* 移動游標至現在位置 */
+      } while (1);
+    }
+
+   void initial()                       /* 自定開啟 curses 函式 */
+   {
+     initscr();
+     cbreak();
+     nonl();
+     noecho();
+     intrflush(stdscr,FALSE);
+     keypad(stdscr,TRUE);
+     refresh();
+    }
+
+
+
+  ■ 後記
+
+    學完了上述的一些命令,  相不相信您已經可以寫出一個漂亮的全螢幕編輯
+    器了? 事實上, curses 提供的函式不下  200 個, 可是筆者認為, 一切再
+    複雜的函式都可以用本文提到的一些組合變化而成,  學了太多的函式, 只
+    是徒增自己困擾罷了.  當然,  如果您對其它函式有興趣,  可以自行參閱
+    curses 說明檔.  ( 方法: % man curses ) 本文不過行拋磚引玉之效, 也
+    希望未來能陸續出現更多同學自行創作的程式.
+
+     * 任何疑問及建議, 歡迎 e-mail 至 ljh@CCCA.NCTU.edu.tw. 謝謝 ! *
+
+ 註一:
+     請參考 /usr/share/lib/termcup
+            /usr/share/lib/terminfo/s/sun
+
+ 註二:
+     1.如果是 BSD 的版本, 需使用
+       cc [file.c] -lcurses -ltermcap 來完成 compile.
+
+     2.計中工作站不知何故將原來的 /usr/5bin/cc 更改為 /usr/5bin/cc.org
+       因此, 您若想在計中工作站 compile curses 程式.需以 /usr/5bin/cc.org
+       取代 /usr/5bin/cc , 否則 compile 可能發生錯誤.
+
+     3.較舊版的 curses 需同時引進 curses 和 termlib 這兩個 library,
+       因此, 您必須使用 /usr/5bin/cc [file.c] -lcurses -ltermlib 來 compile.
+
+ 註三:
+      根據筆者的經驗, 上下左右方向鍵應可正常使用而不會發生問題, 但其它
+      如 PgUp,PgDn,功能鍵,Home,End 等特殊鍵, 很容易因機器﹑鍵盤不同而無
+      法使用, 因此, 若您的程式須要在不同的機器上使用, 建議您只用方向鍵來
+      控制, 其它的特殊鍵少用為妙.
+
+      至於 PgUp,PgDn 一些特殊鍵的控制方法, 由於較為複雜, 有興趣的同學可參
+      考 tin 原始程式 curses.c 內所使用的一些方法.
+
+=============================================================================
+
+                 UNIX 螢幕導向程式的發展利器 - curses (二)
+
+
+                                                          校園網路策進會
+                                                          會長    林建宏
+
+
+      在上期為您介紹完了 curses.h 函式庫的一些基本函式呼叫後在, 在本期裡
+    , 我們將繼續為您介紹 curses 有關多視窗處理的函式. 有了這些函式, 我們
+    可以在程式裡同時處理多個不同的視窗.  如 joe 編輯器內我們可將螢幕切割
+    成好幾個小螢幕, 並且可以在這些不同的螢幕間做切換並編輯不同的檔案, 這
+    就是多視處理的應用. 另外, 有關 POP-UP 視窗的製作, 以及視窗的捲動, 在
+    本文裡, 我們將以簡單的例子, 告訴您這些功能是如何做到的. 關於一些較基
+    本函式的用法, 我們將不再特別介紹. 如果您尚未熟悉 curses 基本函式使用
+    方法, 請參閱上一期 (80 期 ) 通訊.
+
+
+  ■ 視窗的建立
+
+    視窗的建立, 以 newwin() 這個函式來完成.  同時, 需宣告此視窗為 WINDOW
+    結構變數.
+
+    WINDOW *newwin(lines,colums,start_y,start_x);
+
+     WINDOW *win;
+     win=newwin(10,20,0,0);
+
+    如此, 將以 (0,0) 為原點, 取一個 10 列 20 行的矩形為一新的視窗.  今後
+    我們只要呼叫 win 這個變數, 就可以對這新視窗做處理.
+
+     如: wmove(win,3,2);
+
+
+  ■ 多視窗處理函式的格式
+
+    這一類函式和一般的基本函式極為類似, 幾乎每一個基本函式都有一個對應的
+    視窗處理函式.  一般將 'w' 加在函式的裡頭作為區別, 'w' 乃 'window' 之
+    意. 另外, 因為可同時處理多個視窗, 在呼叫使用時, 需特別指定欲處理的視
+    窗. 當然, 如果您指定對 stdscr 做處理, 由於是對標準輸出入螢幕處理, 其
+    作用將相當於一般基本的函式.
+
+     如:
+
+      wmove(win,y,x)     即對 win 這個視窗做 move() 動作.
+      wmove(stdscr,y,x)  相當於 move(y,x)
+
+    介紹一些較重要的函式
+
+    wmove(win,y,x)
+    touchwin(win)
+    wrefresh(win)
+    mvwaddstr(win,y,x,str)
+    wattron(attr)
+    delwin(win)
+    subwin(win,ny,nx,y,x)
+
+    其他函式多和基本函式互為對應, 故不全部列出, 詳細名稱可參考 curses
+    的 online manual.
+
+  ■ 視窗內的座標系
+
+    視窗內的座標系, 將以此視窗的起始點為新原點, 並以其相對位置作為新的
+    座標. 舉例來說
+
+    win=newwin(10,20,5,5);
+    wmove(win,2,3);
+
+    將以 (5,5) 為新原點,  y 方向移動 2 單位, x 方向移動 3 單位. 因此實際
+    上, 游標將移動至 y=7 x=8 的位置上.
+
+
+  ■ POP-UP 視窗的建立
+
+    利用 curses 所提供的視窗處理函式, 我們可以做出像  ONLINE HELP 的 POP
+    -UP 畫面. 當按下某鍵後, 一個新的視窗將像 " 跳 " 出來一般覆蓋原來的畫
+    面. 當關掉此視窗後, 又不會影響到原來被覆蓋的畫面.
+
+
+    下面的例子, 我們及模擬 ONLINE HELP 的形式, 當按下 'h' 鍵時, 視窗即出現
+
+
+   #include <curses.h>
+
+   main()
+    {
+     int ch,x,y;
+     WINDOW *win;
+
+     initscr();   ←┐
+     cbreak;        │ 啟動 curses 模式
+     noecho();      │
+     nonl();      ←┘
+
+     win=newwin(4,30,LINES/2-3, COLS/2-15);/* 建立一個新視窗, 其中LINES,COLS */
+     box(win,'|','-');                     /* 為 curses 內定值, 即螢幕行/列數*/
+     mvwaddstr(win,1,4,"This is another screen");
+     mvwaddstr(win,2,2,"Press anykey to continue..");
+
+     for (y=0;y<LINES;++y)     /* 以'@'填滿螢幕 */
+      for (x=0;x<COLS;++x)
+        mvprintw(y,x,"@");
+
+      for(;;) {
+       refresh();
+       ch=getch();
+       switch(ch) {
+         case 'q':                /* 按 'q' 鍵離開 */
+                   endwin();
+                   exit(0);
+
+         case '\t':              /* 按 [TAB] 鍵 呼叫另一視窗   */
+           touchwin(win);        /* wrefresh() 前需 touchwin() */
+           wrefresh(win);
+           getch();              /* 按任意鍵關閉視窗 */
+           touchwin(stdscr);
+           break;
+
+         default:break;
+        }
+      }
+    }
+
+
+   執行結果:
+
+      ┌────────────────────────────┐
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      └────────────────────────────┘
+                     ↑ 原來畫面被 '@' 填滿, 按下[TAB]鍵後
+                     ↓ 出現 POP-UP 畫面.
+      ┌────────────────────────────┐
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@   ---------------------------+@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@|   This is another screen   |@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@| Press anykey to continue.. |@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@   ---------------------------+@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      │ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ │
+      └────────────────────────────┘
+
+
+  ■ 視窗的捲動
+
+    視窗的捲動, 掖Q用來配合視窗的處理, 當我們持續對視窗輸出直到視窗的游
+    標移動至最後一列時, 如果我們再輸出一列或是輸出一個換行字元時, 視窗可
+    整個往上捲動一行. 這對我們撰寫一個編輯程式時, 是尤其重要的, 一個畫面
+    無法捲動的編輯器, 勢必無法處理超過一個螢幕大小的檔案.
+
+    視窗的捲動是預設為關閉的, 並以 scrollok() 來控制開閉.
+
+    scrollok(win,TRUE);    開啟
+    scrollok(win,FALSE);   關閉
+
+
+    下面的例子因為不斷地輸出 0,1,2.. 故將以一個 40 * 10 的視窗不停的捲動
+
+      #include <curses.h>
+
+      main()
+       {
+         int i;
+         WINDOW *scrwin,*boxwin;
+
+         initscr();     ←┐
+         cbreak;          │ 啟動 curses 模式
+         noecho();        │
+         nonl();        ←┘
+
+         scrwin=newwin(10,40,LINES/2-6,COLS/2-25); /* 設定另一視窗大小 */
+         boxwin=newwin(12,42,LINES/2-7,COLS/2-26); /* 設定外框視窗大小 */
+
+         scrollok(scrwin,TRUE);  /* 開啟視窗捲動功能 */
+
+         box(boxwin,'|','-');
+         refresh();
+         wrefresh(boxwin);
+
+         for (i=0;;++i)         /* 不斷地在視窗內輸出 0-8 的數字,使視窗捲動 */
+           {
+           wprintw(scrwin,"%d",i%9);
+           wrefresh(scrwin);
+           }
+        }
+
+
+      執行結果:
+            ┌──────────────────────┐
+            │            ---------------------             │
+            │         |3456780123456780123412| ↑ 視     │
+            │         |3456780123456780123456| │ 窗     │
+            │         |7801234567801234567801| │ 不     │
+            │         |2345678012345678012345| │ 停     │
+            │         |6780123456780123456780| │ 往     │
+            │         |1234567801234567801234| │ 上     │
+            │         |5678012345678012345678| │ 捲     │
+            │         |0123456780123456780123| │ 動     │
+            │            ---------------------             │
+            │                                            │
+            └──────────────────────┘
+
+
+  ■ 範例 - 模擬 joe 分割畫面同時編輯兩個檔案
+
+     在下面的例子裡, 我們應用了多視窗處理的函式, 改良上回介紹的編輯器,
+     在這個程式裡, 我們可以同時編輯兩個畫面, 並以 [ESC] 做不同視窗間的
+     切換. 同時, 按下 [TAB] 鍵, 會出現 POP-UP 的 ONLINE HELP.
+
+
+   #include <curses.h>
+
+   void initial();
+
+   main()
+   {
+     WINDOW *win[2],*curwin,*helpwin;
+     int nowwin;
+     int x,y;
+     int i;
+     int ch;
+
+     initial();
+
+     win[0]=newwin(LINES/2-1,COLS-1,0,0);       /* 設定兩個視窗的大小*/
+     win[1]=newwin(LINES/2-1,COLS-1,LINES/2,0);
+
+     helpwin=newwin(3,30,2,COLS/2-15 );        /* ONLINE HELP 的大小 */
+     box(helpwin,'|','-');
+     mvwaddstr(helpwin,0,10,"ONLINE HELP");    /* ONLINE HELP 的內容 */
+     mvwaddstr(helpwin,1,4,"Hit any key to continue..");
+
+     for (i=0;i<COLS-1;++i)              /* 畫兩個視窗間的界限 */
+       mvaddch(LINES/2-1,i,'-');
+
+     nowwin=0;                          /* 先指定游標在第一視窗 */
+     curwin=win[nowwin];
+     getyx(curwin,y,x);
+     move(0,0);
+     refresh();
+
+     refresh();
+
+     do {
+       ch=getch();
+       switch(ch) {
+
+         case KEY_UP: --y;             /* 判斷是否"↑"鍵被按下       */
+                      break;
+         case KEY_DOWN: ++y;           /* 判斷是否"↓"鍵被按下       */
+                      break;
+         case KEY_RIGHT: ++x;          /* 判斷是否"→"鍵被按下       */
+                      break;
+         case KEY_LEFT: --x;           /* 判斷是否"←"鍵被按下       */
+                      break;
+         case '\r':                    /* 判斷是否 ENTER 鍵被按下    */
+                   ++y;
+                   x=0;
+                   break;
+         case '\t':                    /* 判斷是否 TAB 鍵被按下      */
+                   touchwin(helpwin);
+                   wrefresh(helpwin);  /* 呼叫 ONLINE HELP */
+                   getch();
+                   touchwin(win[1-nowwin]);  /* 重畫第一,二視窗 */
+                   wrefresh(win[1-nowwin]);
+                   touchwin(curwin);
+                   wrefresh(curwin);
+                   break;
+         case 127:                      /* 判斷是否 BACKSPACE 鍵被按下 */
+                   wmove(curwin,y,--x);/* delete 一個字元            */
+                   waddch(curwin,' ');
+                   break;
+
+         case 27 : nowwin=1-nowwin;     /* [ESC] 鍵切換視窗 */
+                   curwin=win[nowwin];
+                   getyx(curwin,y,x);
+                   break;
+         default:
+                   waddch(curwin,ch);
+                   x++;
+                   break;
+       }
+       wmove(curwin,y,x);
+       wrefresh(curwin);
+     } while(1);
+   }
+
+   void initial()
+   {
+     initscr();                  ←┐
+     cbreak();                     │ 啟動 curses 模式
+     nonl();                       │
+     noecho();                   ←┘
+     intrflush(stdscr,FALSE);
+     keypad(stdscr,TRUE);
+     refresh();
+   }
+
+
+    執行結果:
+
+           ┌─────────────────────────────┐
+           │    screen1                                               │
+     ┌→  │         this is screen 1, you can press [ESC] to         │
+  以 │    │     switch between screen 1 and screen 2.                │
+[ESC]│    │                                                          │
+  切 │    │                                                          │
+  換 │    │----------------------------------------------------------│
+  游 │    │     screen 2                                             │
+  標 │    │                                                          │
+  位 └→  │        _ (游標)                                          │
+  置       │                                                          │
+           └─────────────────────────────┘
+                                   ↑ 按下[TAB] 鍵,出現 ONLINE HELP
+                                   ↓
+           ┌─────────────────────────────┐
+           │    screen1                                               │
+           │         this is screen 1, you can press [ESC] to         │
+           │     switch   --------ONLINE HELP--------                   │
+           │           |   Hit any key to continue..|                 │
+           │              ---------------------------                   │
+           │----------------------------------------------------------│
+           │     screen 2                                             │
+           │                                                          │
+           │                                                          │
+           │                                                          │
+           └─────────────────────────────┘
+                                   ↑ 按任意鍵, ONLINE HELP 關閉
+                                   ↓
+           ┌─────────────────────────────┐
+           │    screen1                                               │
+           │         this is screen 1, you can press [ESC] to         │
+           │     switch between screen 1 and screen 2.                │
+           │                                                          │
+           │                                                          │
+           │----------------------------------------------------------│
+           │     screen 2                                             │
+           │                                                          │
+           │        _ (游標)                                          │
+           │                                                          │
+           └─────────────────────────────┘
+
+ ■ 結語
+
+    我們以連續兩期來介紹 curses.h 函式庫的使用方法, 相信同學對撰寫這類的
+    程式應該不再陌生. 所謂『戲法人人會變, 巧妙各有不同』. 知道了基本函式
+    的呼叫方法, 能不能寫出實用的程式, 就靠各位的巧思和創造力了.
+
+    有任何問題建議, 歡迎 E-mail 至  ljh@CCCA.NCTU.edu.tw , 謝謝 !
+===============================================================================
+
+ 
